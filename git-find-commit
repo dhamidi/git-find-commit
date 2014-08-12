@@ -1,0 +1,124 @@
+#!/bin/sh
+
+set -ue
+
+FIND_COMMIT_PATTERN=
+GIT_DIR=$PWD
+GIT_OBJECT_DIRECTORY=
+OPT_SHOW_COMMITS=''
+
+main() {
+    init
+    parse_options "$@"
+    find_commit_everywhere |
+    if [ -n "$OPT_SHOW_COMMITS" ]; then
+        xargs -n 100 git show -s --oneline
+    else
+        cat
+    fi
+}
+
+init() {
+    # Special exit codes from /usr/include/sysexits.h
+    EX_USAGE=64
+
+    GIT_DIR=$(git rev-parse --git-dir)
+    if [ $? != 0 ]; then
+        usage_error "Not in a git repository."
+    else
+        GIT_DIR=$PWD/$GIT_DIR
+        GIT_OBJECT_DIRECTORY=${GIT_OBJECT_DIRECTORY:-${GIT_DIR}/objects}
+    fi
+}
+
+usage_error() {
+    {
+        printf "Usage error: %s\n" "$1"
+        show_usage
+    } 1>&2
+
+    exit $EX_USAGE
+}
+
+show_usage() {
+    cat <<EOF
+Usage:
+  $0 [-o] <regex>
+  $0 -h
+
+Options:
+  -o Show commit summary (like git log --oneline)
+
+Parameters:
+  <regex>  The pattern to search for in commit messages.
+
+Description:
+  Search through commits with log messages matching a certain pattern.
+
+  When a match is found, the matching commit's id is printed to stdout.
+EOF
+}
+
+parse_options() {
+    while getopts 'ho' flag; do
+        case $flag in
+            o)
+                OPT_SHOW_COMMITS=y
+                ;;
+            h)
+                show_usage
+                exit 0
+                ;;
+        esac
+    done
+
+    shift $((OPTIND - 1))
+
+    parse_arguments "$@"
+}
+
+parse_arguments() {
+    if [ -z "$1" ]; then
+        usage_error "Parameter <regex> is required."
+    fi
+
+    FIND_COMMIT_PATTERN=$1
+}
+
+find_commit_everywhere() {
+    FOUND_COMMIT_IDS=$(find_commit current)
+    if [ ${#FOUND_COMMIT_IDS} -le 1 ]; then
+        FOUND_COMMIT_IDS=$(find_commit packed)
+    fi
+
+    printf "%s\n" $FOUND_COMMIT_IDS
+}
+
+find_commit() {
+    list_commits ${1:-current} |
+    xargs -n 1000 git rev-list --grep="$FIND_COMMIT_PATTERN"
+}
+
+list_commits() {
+    list_${1}_objects |
+    filter_for_commits
+}
+
+filter_for_commits() {
+    git cat-file --batch-check='%(objecttype) %(objectname)' |
+    awk '$1 == "commit" { print $2 }'
+}
+
+list_current_objects() {
+    find "$GIT_OBJECT_DIRECTORY" -type f -name '[a-f][a-f]*' |
+    sed "s,${GIT_OBJECT_DIRECTORY}/\\(..\\)/,\\1,"
+}
+
+list_packed_objects() {
+    find "$GIT_OBJECT_DIRECTORY"/pack -type f -name 'pack-*.idx' |
+    xargs cat |
+    git show-index |
+    awk '{print $2}'
+}
+
+[ $0 = sh ] || main "$@"

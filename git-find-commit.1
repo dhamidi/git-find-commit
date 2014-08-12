@@ -1,0 +1,40 @@
+.\" Copyright (C), 2014  Dario Hamidi
+.\" You may distribute this file under the terms of the GNU Free
+.\" Documentation License.
+.TH git-find-commit 1 2014-08-12
+.SH NAME
+git-find-commit \- Find commit by match in log message.
+.SH SYNOPSIS
+.B git-find-commit
+\fI[-o]\fR <regex>
+.br
+.B git-find-commit
+-h
+.SH DESCRIPTION
+.B git-find-commit
+searches through \fBall\fR commits in the repository for commit objects with a
+commit message matching <regex>.
+.PP
+It first tries to find matching commits by looking at the objects stored in
+\fI$GIT_OBJECT_DIRECTORY/[a-f][a-f]\fR.  If no matching commit is found
+there, the pack archives in \fI$GIT_OBJECT_DIRECTORY/pack\fR are
+unpacked and searched for a matching commit.
+.PP
+This is useful for finding unreachable commits or quickly finding commit
+in general.
+.SH OPTIONS
+.TP
+.BR \-h
+Display a brief message describing the usage of the program.
+.BR \-o
+Output a short summary of the matching commits.
+.SH FILES
+.TP
+$GIT_OBJECT_DIRECTORY/[a-f][a-f], $GIT_OBJECT_DIRECTORY/pack/pack-*.idx
+Commit objects are searched in these directories.
+.SH "SEE ALSO"
+.BR git (1)
+.SH BUGS
+None known so far.
+.SH AUTHOR
+Dario Hamidi <dario@gowriteco.de>
